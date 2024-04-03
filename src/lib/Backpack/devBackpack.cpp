@@ -26,6 +26,8 @@ bool lastRecordingState = false;
 #define PASSTHROUGH_BAUD BACKPACK_LOGGING_BAUD
 #endif
 
+#define GPIO_PIN_BOOT0 0
+
 #include "CRSF.h"
 #include "hwTimer.h"
 
@@ -90,12 +92,43 @@ void startPassthrough()
 }
 #endif
 
+#if defined(GPIO_PIN_BACKPACK_EN)
+static int debouncedRead(int pin) {
+    static const uint32_t debounce_delay = 5;
+    static const uint8_t max_samples = 5;
+    static const uint8_t min_matches = 2;
+
+    uint8_t matches = 0;
+    int last_state = digitalRead(pin);
+
+    for (uint8_t i = 0; i < max_samples; i++) {
+        delay(debounce_delay);
+        int current_state = digitalRead(pin);
+        if (current_state == last_state) {
+            matches += 1;
+        } else {
+            matches = 0;
+        }
+
+        if (matches == min_matches) {
+            return current_state;
+        }
+        last_state = current_state;
+    }
+
+    return -1;
+}
+#endif
+
 void checkBackpackUpdate()
 {
 #if defined(GPIO_PIN_BACKPACK_EN)
     if (GPIO_PIN_BACKPACK_EN != UNDEF_PIN)
     {
-        if (!digitalRead(0))
+        // Only start debouncing in case the first readout is low.
+        // This adds debouncing capabilities while not introducing
+        // latency for the default hot loop.
+        if (digitalRead(GPIO_PIN_BOOT0) == 0 && debouncedRead(GPIO_PIN_BOOT0) == 0)
         {
             startPassthrough();
         }
@@ -225,7 +258,7 @@ static void initialize()
 #if defined(GPIO_PIN_BACKPACK_EN)
     if (GPIO_PIN_BACKPACK_EN != UNDEF_PIN)
     {
-        pinMode(0, INPUT); // setup so we can detect pinchange for passthrough mode
+        pinMode(GPIO_PIN_BOOT0, INPUT); // setup so we can detect pinchange for passthrough mode
         pinMode(GPIO_PIN_BACKPACK_BOOT, OUTPUT);
         pinMode(GPIO_PIN_BACKPACK_EN, OUTPUT);
         // Shut down the backpack via EN pin and hold it there until the first event()
