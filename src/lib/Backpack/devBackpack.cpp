@@ -93,29 +93,43 @@ void startPassthrough()
 #endif
 
 #if defined(GPIO_PIN_BACKPACK_EN)
+
 static int debouncedRead(int pin) {
-    static const uint32_t debounce_delay = 5;
-    static const uint8_t max_samples = 5;
+    static const uint8_t sample_period_cycles = 100;
     static const uint8_t min_matches = 2;
 
-    uint8_t matches = 0;
-    int last_state = digitalRead(pin);
+    static uint8_t cycle = 0;
+    static int last_state = -1;
+    static uint8_t matches = 0;
 
-    for (uint8_t i = 0; i < max_samples; i++) {
-        delay(debounce_delay);
-        int current_state = digitalRead(pin);
-        if (current_state == last_state) {
-            matches += 1;
-        } else {
-            matches = 0;
-        }
+    int current_state;
 
-        if (matches == min_matches) {
-            return current_state;
-        }
-        last_state = current_state;
+    if (cycle % sample_period_cycles == 0) {
+        // Skip reading the pin in this cycle.
+        cycle++;
+        return -1;
     }
 
+    // Next read is only in sample_period_cycles.
+    cycle = 0;
+
+    current_state = digitalRead(pin);
+    if (current_state == last_state) {
+        matches = min(min_matches, (uint8_t)(matches + 1));
+    } else {
+        // We are bouncing. Reset the match counter.
+        matches = 0;
+    }
+
+    if (matches == min_matches) {
+        // We have a stable state and report it.
+        return current_state;
+    }
+    DBGLN("Bouncing!, current state: %d, last_state: %d, matches: %d", current_state, last_state, matches);
+
+    last_state = current_state;
+
+    // We don't have a definitive state we could report.
     return -1;
 }
 #endif
@@ -125,10 +139,7 @@ void checkBackpackUpdate()
 #if defined(GPIO_PIN_BACKPACK_EN)
     if (GPIO_PIN_BACKPACK_EN != UNDEF_PIN)
     {
-        // Only start debouncing in case the first readout is low.
-        // This adds debouncing capabilities while not introducing
-        // latency for the default hot loop.
-        if (digitalRead(GPIO_PIN_BOOT0) == 0 && debouncedRead(GPIO_PIN_BOOT0) == 0)
+        if (debouncedRead(GPIO_PIN_BOOT0) == 0)
         {
             startPassthrough();
         }
