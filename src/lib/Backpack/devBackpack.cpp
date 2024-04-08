@@ -95,23 +95,12 @@ void startPassthrough()
 #if defined(GPIO_PIN_BACKPACK_EN)
 
 static int debouncedRead(int pin) {
-    static const uint8_t sample_period_cycles = 100;
-    static const uint8_t min_matches = 2;
+    static const uint8_t min_matches = 100;
 
-    static uint8_t cycle = 0;
     static int last_state = -1;
     static uint8_t matches = 0;
 
     int current_state;
-
-    if (cycle % sample_period_cycles == 0) {
-        // Skip reading the pin in this cycle.
-        cycle++;
-        return -1;
-    }
-
-    // Next read is only in sample_period_cycles.
-    cycle = 0;
 
     current_state = digitalRead(pin);
     if (current_state == last_state) {
@@ -119,13 +108,13 @@ static int debouncedRead(int pin) {
     } else {
         // We are bouncing. Reset the match counter.
         matches = 0;
+        DBGLN("Bouncing!, current state: %d, last_state: %d, matches: %d", current_state, last_state, matches);
     }
 
     if (matches == min_matches) {
         // We have a stable state and report it.
         return current_state;
     }
-    DBGLN("Bouncing!, current state: %d, last_state: %d, matches: %d", current_state, last_state, matches);
 
     last_state = current_state;
 
