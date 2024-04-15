@@ -219,13 +219,14 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
     {
       if (firmwareOptions.is_airport)
       {
+        DBGLN("Received RAW data");
         OtaUnpackAirportData(otaPktPtr, &apOutputBuffer);
         return true;
       }
       telemPtr = ota8->tlm_dl.payload;
       dataLen = sizeof(ota8->tlm_dl.payload);
     }
-    //DBGLN("pi=%u len=%u", ota8->tlm_dl.packageIndex, dataLen);
+    DBGLN("pi=%u len=%u", ota8->tlm_dl.packageIndex, dataLen);
     TelemetryReceiver.ReceiveData(ota8->tlm_dl.packageIndex, telemPtr, dataLen);
   }
   // Std res mode
@@ -244,6 +245,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
         break;
 
       case ELRS_TELEMETRY_TYPE_RAW:
+        DBGLN("Received RAW data");
         OtaUnpackAirportData(otaPktPtr, &apOutputBuffer);
         return true;
         break;
@@ -495,6 +497,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
     if (NextPacketIsMspData && MspSender.IsActive())
     {
       otaPkt.std.type = PACKET_TYPE_MSPDATA;
+      DBGLN("Sending MSP packet!");
       if (OtaIsFullRes)
       {
         otaPkt.full.msp_ul.packageIndex = MspSender.GetCurrentPayload(
